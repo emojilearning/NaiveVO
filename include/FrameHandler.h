@@ -30,8 +30,8 @@ namespace nvo {
 	private:
 		FramePtr last_frame{ 0 }, current_frame{ 0 };
 		Stage stage_{ STOPPED };
-		cv::Vec3d position;
-		cv::Mat rotation;
+		//cv::Vec3d position;
+		//cv::Mat rotation;
 		cv::Mat T_f_w;
 		CameraPtr cam_;
 

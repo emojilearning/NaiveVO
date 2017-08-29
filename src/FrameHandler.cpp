@@ -9,9 +9,10 @@ namespace nvo {
 	{
 		current_frame = frm;
 		stage_ = FIRST_FRAME;
-		current_frame->t = position = { 0,0,0 };
-        current_frame->R = rotation = Mat::eye(3,3,CV_64F);
+		//current_frame->t = position = { 0,0,0 };
+  //      current_frame->R = rotation = Mat::eye(3,3,CV_64F);
         T_f_w = Mat::eye(4,4,CV_64F);
+		current_frame->T_f_w = T_f_w.clone();
 	}
 
 	void FrameHandler::featureMatchByKnn(FramePtr last_frame, FramePtr current_frame, vector<DMatch>& matches)
@@ -65,31 +66,27 @@ namespace nvo {
 
 	Mat FrameHandler::triangluate(vector<Point2f> cp0,vector<Point2f> cp1,Mat mask)
 	{
-		Mat proj1(3, 4, CV_64F), proj2(3, 4, CV_64F);
-
-		setIdentity(proj1);
-        proj1 = last_frame->R * proj1;
-        Mat(last_frame->t).convertTo(proj1.col(3), CV_64F);
-        proj1 = Mat(cam_->getK()) * proj1;
-
-        setIdentity(proj2);
-		proj2 = current_frame->R * proj2;
-		Mat(current_frame->t).convertTo(proj2.col(3), CV_64F);
-        proj2 = Mat(cam_->getK())*proj2;
-
+        Mat proj1 = Mat(cam_->getK()) * last_frame->T_f_w(Range(0,3),Range(0,4));
+		Mat proj2 = Mat(cam_->getK()) * current_frame->T_f_w(Range(0, 3), Range(0, 4));
         Mat outp;
-
+		//cout << proj1 << endl;;
+		//cout << proj2 << endl;
 		triangulatePoints(proj1, proj2, cp0, cp1, outp);
-//        cout<<outp<<endl;
-//        cout<<outp.type()<<endl;
+        //cout<< proj1 <<endl;
+        //cout<<outp.type()<<endl;
 		for (int i = 0; i<cp0.size(); i++)
 		{
 			if (mask.at<char>(i))
 			{
 				auto op = outp.col(i);
 				auto w = op.at<float>(3);
+				Point3f p3d = { op.at<float>(0) / w ,op.at<float>(1) / w,op.at<float>(2) / w };
 //				last_frame->m_p_op[cp0[i]] = { op.at<float>(0) / w ,op.at<float>(1) / w,op.at<float>(2) / w };
-				current_frame->m_p_op[cp1[i]] = { op.at<float>(0) / w ,op.at<float>(1) / w,op.at<float>(2) / w };
+				if (last_frame->m_p_op.find(cp0[i])!=last_frame->m_p_op.end())
+				{
+					cout << p3d << "----------" << last_frame->m_p_op[cp0[i]] << endl;
+				}
+				current_frame->m_p_op[cp1[i]] = p3d;
 			}
 		}
         return outp;
@@ -121,10 +118,11 @@ namespace nvo {
         T.at<double>(2,3) = t[2];
 
         cout<<T<<endl;
-        current_frame->R = rotation = R*rotation;
-        current_frame->t = (position = position + Vec3d(t));
+        //current_frame->R = rotation = R*rotation;
+        //current_frame->t = (position = position + Vec3d(t));
+		T_f_w = T*T_f_w;
+		current_frame->T_f_w = T_f_w.clone();
         Mat outp = triangluate(cp0,cp1,mask);
-
 	}
 
 	void FrameHandler::processSecondFrame(FramePtr frm)
@@ -160,16 +158,22 @@ namespace nvo {
 		Mat t;
         cout << cp0.size() << endl;
 
-        solvePnPRansac(cp0, cp1, (Mat)cam_->getK(), noArray(), RR, t,false,100,8,0.999,mask);
+        solvePnPRansac(cp0, cp1, cam_->getK(), noArray(), RR, t,false,100,8,0.999,mask);
         Mat R;
         Rodrigues(RR,R);
-		current_frame->R = rotation = R*rotation;
-		current_frame->t = (position =  position + Vec3d(t));
+		Mat T = Mat::eye(4, 4, CV_64F);
+		R.convertTo(T(Range(0, 3), Range(0, 3)), CV_64F);
+		T.at<double>(0, 3) = t.at<double>(0);
+		T.at<double>(1, 3) = t.at<double>(1);
+		T.at<double>(2, 3) = t.at<double>(2);
+		T_f_w = T*T_f_w;
+		current_frame->T_f_w = T_f_w.clone();
+		//cout << T_f_w << endl;
+		cout << T_f_w.col(3) << endl;
 		for (int i = 0; i<mask.size(); i++)
 		{
 			current_frame->m_p_op[cp1[mask[i]]] = cp0[mask[i]];
 		}
-        cout<<position<<endl;
         Mat mask1;
         Mat E = findEssentialMat(ccp0, ccp1,cam_->getK(), FM_RANSAC, 0.999,1.0,mask1);
         triangluate(ccp0,ccp1,mask1);
@@ -186,8 +190,6 @@ namespace nvo {
 		vector<DMatch> matches;
 		featureMatchByKnn(last_frame, current_frame, matches);
 		solvePoseByPnP(last_frame->kpts, current_frame->kpts, matches);
-
-
 	}
 
 	bool FrameHandler::pocessFrame(FramePtr frm) {

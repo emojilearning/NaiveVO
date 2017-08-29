@@ -6,12 +6,6 @@
 using namespace cv;
 using namespace std;
 using namespace nvo;
-//fx = 525.0  # focal length x
-//        fy = 525.0  # focal length y
-//        cx = 319.5  # optical center x
-//        cy = 239.5  # optical center y
-
-
 
 int runFromTUM(string data_path)
 {
@@ -42,8 +36,12 @@ int runFromTUM(string data_path)
 
 int main()
 {
-    string data_path = "../rgbd_dataset_freiburg1_desk2/";
-    if(runFromTUM(data_path)!=0)
+#ifdef WIN32
+    string data_path = "../../rgbd_dataset_freiburg1_desk2/";
+#else
+	string data_path = "../rgbd_dataset_freiburg1_desk2/";
+#endif
+	if(runFromTUM(data_path)!=0)
     {
         cout<<"the path may be not correct"<<endl;
     }

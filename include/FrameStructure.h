@@ -24,14 +24,14 @@ namespace nvo
         std::vector<cv::KeyPoint> kpts;
         cv::Mat descriptor;
         double timestamp;
-        cv::Mat R;
-        cv::Vec3d t;
-        cv::Mat E;
+        //cv::Mat R;
+        //cv::Vec3d t;
 		struct point_hash
 		{
 			size_t operator()(cv::Point2i p) const { return p.x + p.y * 10000; }
 		};
 		std::unordered_map < cv::Point2i, cv::Point3f, point_hash > m_p_op;
+		cv::Mat T_f_w;
     };
     typedef std::shared_ptr<Frame> FramePtr;
 
