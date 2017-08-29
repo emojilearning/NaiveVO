@@ -18,7 +18,6 @@ namespace nvo {
 		};
 		FrameHandler() {};
 		void solvePose(std::vector<cv::KeyPoint> &kpts_0, std::vector<cv::KeyPoint> &kpts_1, std::vector<cv::DMatch>& matches);
-		void featureMatchByKnn(FramePtr last_frame, FramePtr current_frame, std::vector<cv::DMatch>& matches);
 		void processFirstFrame(FramePtr frm);
 		void processSecondFrame(FramePtr frm);
 		void processCommonFrame(FramePtr frm);

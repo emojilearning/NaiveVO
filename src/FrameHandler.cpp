@@ -1,5 +1,6 @@
 #include <FrameHandler.h>
 #include <opencv2/opencv.hpp>
+#include <nvo_util.h>
 using namespace cv;
 using namespace std;
 
@@ -15,54 +16,9 @@ namespace nvo {
 		current_frame->T_f_w = T_f_w.clone();
 	}
 
-	void FrameHandler::featureMatchByKnn(FramePtr last_frame, FramePtr current_frame, vector<DMatch>& matches)
-	{
 
-		vector<KeyPoint>& kpts_m = last_frame->kpts;
-		Mat& desp_m = last_frame->descriptor;
-		vector<KeyPoint>& kpts_i = current_frame->kpts;
-		Mat& desp_i = current_frame->descriptor;
-		//FlannBasedMatcher matcher2(new flann::LshIndexParams(20, 10, 2));
-		if (kpts_i.size() == 0 || kpts_m.size() == 0)
-			return;
-		auto cross_matcher = BFMatcher::create(NORM_HAMMING, true);
-		auto knn_matcher = BFMatcher::create(NORM_HAMMING);
-		//auto knn_matcher = &matcher2;
-		vector<DMatch> cross_matches;
-		vector<vector<DMatch>> knn_matches;
-		cross_matcher->match(desp_m, desp_i, cross_matches);
-		knn_matcher->knnMatch(desp_m, desp_i, knn_matches, 2);
-		vector<bool> mask(knn_matches.size(), true);
-		int i = 0;
-		for (auto m = knn_matches.begin(); m != knn_matches.end(); m++)
-		{
-			if (m->size() == 1)
-				continue;
-			else if (m->size() == 0)
-				mask[i] = false;
-			else if ((*m)[0].distance / (*m)[1].distance > 1.0 / 1.5)
-				mask[i] = false;
-			i++;
-		}
-		i = 0;
-		for (auto m : knn_matches)
-		{
-			if (!mask[i++])
-				continue;
-			for (auto n : cross_matches)
-			{
-				if (m[0].trainIdx == n.trainIdx&&m[0].queryIdx == n.queryIdx)
-					matches.push_back(n);
-			}
-		}
-		const int limit = 60;
-		//if (matches.size() > limit)
-		//{
-		//	nth_element(matches.begin(), matches.begin() + limit, matches.end());
-		//	matches.erase(matches.begin() + limit, matches.end());
-		//}
 
-	}
+
 
 	Mat FrameHandler::triangluate(vector<Point2f> cp0,vector<Point2f> cp1,Mat mask)
 	{
@@ -84,7 +40,7 @@ namespace nvo {
 //				last_frame->m_p_op[cp0[i]] = { op.at<float>(0) / w ,op.at<float>(1) / w,op.at<float>(2) / w };
 				if (last_frame->m_p_op.find(cp0[i])!=last_frame->m_p_op.end())
 				{
-					cout << p3d << "----------" << last_frame->m_p_op[cp0[i]] << endl;
+//					cout << p3d << "----------" << last_frame->m_p_op[cp0[i]] << endl;
 				}
 				current_frame->m_p_op[cp1[i]] = p3d;
 			}
@@ -117,11 +73,19 @@ namespace nvo {
         T.at<double>(1,3) = t[1];
         T.at<double>(2,3) = t[2];
 
-        cout<<T<<endl;
+
         //current_frame->R = rotation = R*rotation;
         //current_frame->t = (position = position + Vec3d(t));
 		T_f_w = T*T_f_w;
 		current_frame->T_f_w = T_f_w.clone();
+        cout << T_f_w.col(3).t() << endl;
+        Mat tempRout;
+        Rodrigues(T(Range(0, 3), Range(0, 3)),tempRout);
+        Mat Rout;
+        cout<<"asdasd"<<endl;
+        quatFromAngularVelocity(Rout,tempRout);
+        cout <<Rout.t()<<endl;
+
         Mat outp = triangluate(cp0,cp1,mask);
 	}
 
@@ -130,10 +94,11 @@ namespace nvo {
 		last_frame = current_frame;
 		current_frame = frm;
 		vector<DMatch> matches;
-		featureMatchByKnn(last_frame, current_frame, matches);
+		featureMatchByKnn(last_frame->descriptor, current_frame->descriptor, matches);
 		solvePose(last_frame->kpts, current_frame->kpts, matches);
 		stage_ = OK;
 	}
+
 
 	void FrameHandler::solvePoseByPnP(vector<KeyPoint> &kpts_0, vector<KeyPoint> &kpts_1, vector<DMatch>& matches)
 	{
@@ -168,8 +133,14 @@ namespace nvo {
 		T.at<double>(2, 3) = t.at<double>(2);
 		T_f_w = T*T_f_w;
 		current_frame->T_f_w = T_f_w.clone();
+        Mat tempRout;
+        Rodrigues(T(Range(0, 3), Range(0, 3)),tempRout);
 		//cout << T_f_w << endl;
-		cout << T_f_w.col(3) << endl;
+		cout << T_f_w.col(3).t() << endl;
+
+        Mat Rout;
+        quatFromAngularVelocity(Rout,tempRout);
+        cout <<Rout.t()<<endl;
 		for (int i = 0; i<mask.size(); i++)
 		{
 			current_frame->m_p_op[cp1[mask[i]]] = cp0[mask[i]];
@@ -188,7 +159,7 @@ namespace nvo {
 		last_frame = current_frame;
 		current_frame = frm;
 		vector<DMatch> matches;
-		featureMatchByKnn(last_frame, current_frame, matches);
+		featureMatchByKnn(last_frame->descriptor, current_frame->descriptor, matches);
 		solvePoseByPnP(last_frame->kpts, current_frame->kpts, matches);
 	}
 
